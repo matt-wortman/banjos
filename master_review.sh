@@ -8,6 +8,7 @@ Usage: ./master_review.sh <repo_path> [OPTIONS]
 Options:
   --name NAME               Human-readable codebase name for report
   --output DIR              Output root directory (default: ./output)
+  --allow-nondefault-output Allow --output outside default ./output root
   --model-default MODEL     Model for non-security agents
   --model-security MODEL    Model for security agents
   --model-synthesis MODEL   Model for synthesis agent
@@ -49,6 +50,9 @@ MODEL_SYNTHESIS="claude-opus-4-6"
 PARALLEL_LIMIT=4
 DOCS_LIMIT_LINES=300
 OUTPUT_DIR="$TOOLKIT_ROOT/output"
+DEFAULT_OUTPUT_DIR="$TOOLKIT_ROOT/output"
+OUTPUT_OVERRIDDEN=false
+ALLOW_NONDEFAULT_OUTPUT=false
 SKIP_STATIC=false
 SKIP_SECRETS=false
 RESUME=false
@@ -73,7 +77,12 @@ while [[ $# -gt 0 ]]; do
     --output)
       [[ $# -lt 2 ]] && { echo "Error: --output requires a value" >&2; exit 2; }
       OUTPUT_DIR="$2"
+      OUTPUT_OVERRIDDEN=true
       shift 2
+      ;;
+    --allow-nondefault-output)
+      ALLOW_NONDEFAULT_OUTPUT=true
+      shift
       ;;
     --model-default)
       [[ $# -lt 2 ]] && { echo "Error: --model-default requires a value" >&2; exit 2; }
@@ -158,6 +167,16 @@ if [[ -n "$PREVIOUS_REPORT" && ! -f "$PREVIOUS_REPORT" ]]; then
   exit 2
 fi
 
+OUTPUT_DIR_ABS="$(realpath -m "$OUTPUT_DIR")"
+DEFAULT_OUTPUT_DIR_ABS="$(realpath -m "$DEFAULT_OUTPUT_DIR")"
+if [[ "$OUTPUT_OVERRIDDEN" == "true" && "$OUTPUT_DIR_ABS" != "$DEFAULT_OUTPUT_DIR_ABS" && "$ALLOW_NONDEFAULT_OUTPUT" != "true" ]]; then
+  echo "Error: non-default --output is blocked by default." >&2
+  echo "  Requested: $OUTPUT_DIR_ABS" >&2
+  echo "  Default:   $DEFAULT_OUTPUT_DIR_ABS" >&2
+  echo "  Re-run with --allow-nondefault-output if you intentionally want this." >&2
+  exit 2
+fi
+
 sanitize_name() {
   local value="$1"
   value="$(printf "%s" "$value" | sed -E 's/^[[:space:]]+//; s/[[:space:]]+$//')"
@@ -185,7 +204,6 @@ should_run_phase() {
   return 0
 }
 
-OUTPUT_DIR_ABS="$OUTPUT_DIR"
 mkdir -p "$OUTPUT_DIR_ABS"
 
 REPO_BASENAME="$(basename "$REPO_PATH")"

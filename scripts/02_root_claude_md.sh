@@ -67,12 +67,15 @@ CLAUDE_OUTPUT_PATH="$REPO_PATH/CLAUDE.md"
 MODULES_OUTPUT_PATH="$REPO_PATH/modules.json"
 
 echo "Running Phase 2 root generation..."
-printf '%s' "$ASSEMBLED_PROMPT" \
-  | claude \
-    --model "$MODEL_DEFAULT" \
-    --dangerously-skip-permissions \
-    -p \
-    > "$RAW_OUTPUT_PATH"
+prompt_file="$(mktemp)"
+printf '%s' "$ASSEMBLED_PROMPT" > "$prompt_file"
+claude \
+  --model "$MODEL_DEFAULT" \
+  --dangerously-skip-permissions \
+  -p \
+  < "$prompt_file" \
+  > "$RAW_OUTPUT_PATH"
+rm -f "$prompt_file"
 
 extract_delimited_block() {
   local begin_marker="$1"

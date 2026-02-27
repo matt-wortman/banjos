@@ -528,6 +528,7 @@ run_review_worker() {
   local osv_json
   local source_file_contents
   local assembled_prompt
+  local prompt_file
   local attempt
   local raw_file
   local normalized_file
@@ -607,10 +608,12 @@ run_review_worker() {
       assembled_prompt+=$'\n\n'"$retry_note"
     fi
 
+    prompt_file="$(mktemp)"
+    printf '%s' "$assembled_prompt" > "$prompt_file"
     raw_file="$(mktemp)"
     normalized_file="$(mktemp)"
-    if ! printf '%s' "$assembled_prompt" | claude --model "$model_name" --dangerously-skip-permissions -p > "$raw_file"; then
-      rm -f "$normalized_file"
+    if ! claude --model "$model_name" --dangerously-skip-permissions -p < "$prompt_file" > "$raw_file"; then
+      rm -f "$prompt_file" "$normalized_file"
       if [[ "$attempt" -eq 2 ]]; then
         write_invalid_json_fallback "$output_path" "$module_id" "$raw_file"
         rm -f "$raw_file"
@@ -620,6 +623,7 @@ run_review_worker() {
       retry_note="IMPORTANT: respond with ONLY valid JSON and no markdown fences."
       continue
     fi
+    rm -f "$prompt_file"
 
     if normalize_json_response "$raw_file" "$normalized_file"; then
       if [[ "$review_kind" == "comprehensive" ]]; then

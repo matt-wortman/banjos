@@ -337,15 +337,19 @@ RAW_OUTPUT_PATH="${REPORT_PATH_MD%.md}_raw.txt"
 echo "Running Phase 6 synthesis..."
 attempt_prompt="$ASSEMBLED_PROMPT"
 for attempt in 1 2; do
-  if ! printf '%s' "$attempt_prompt" \
-    | claude \
-      --model "$MODEL_SYNTHESIS" \
-      --dangerously-skip-permissions \
-      -p \
-      > "$RAW_OUTPUT_PATH"; then
+  prompt_file="$(mktemp)"
+  printf '%s' "$attempt_prompt" > "$prompt_file"
+  if ! claude \
+    --model "$MODEL_SYNTHESIS" \
+    --dangerously-skip-permissions \
+    -p \
+    < "$prompt_file" \
+    > "$RAW_OUTPUT_PATH"; then
+    rm -f "$prompt_file"
     echo "Error: Claude synthesis invocation failed (model/context/runtime)." >&2
     exit 1
   fi
+  rm -f "$prompt_file"
 
   if [[ ! -s "$RAW_OUTPUT_PATH" ]]; then
     echo "Error: Claude returned empty output for synthesis" >&2

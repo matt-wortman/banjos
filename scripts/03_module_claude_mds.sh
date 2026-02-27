@@ -241,6 +241,7 @@ run_module_agent() {
   local file_listing
   local base_prompt
   local assembled_prompt
+  local prompt_file
   local tmp_output
   local line_count
   local retry_note=""
@@ -313,9 +314,11 @@ run_module_agent() {
       assembled_prompt+=$'\n\n'"$retry_note"
     fi
 
+    prompt_file="$(mktemp)"
+    printf '%s' "$assembled_prompt" > "$prompt_file"
     tmp_output="$(mktemp)"
-    if ! printf '%s' "$assembled_prompt" | claude --model "$MODEL_DEFAULT" --dangerously-skip-permissions -p > "$tmp_output"; then
-      rm -f "$tmp_output"
+    if ! claude --model "$MODEL_DEFAULT" --dangerously-skip-permissions -p < "$prompt_file" > "$tmp_output"; then
+      rm -f "$prompt_file" "$tmp_output"
       if [[ "$attempt" -lt 2 ]]; then
         retry_note="IMPORTANT: Start directly with '# CLAUDE.md — [Module Name]' and avoid markdown fences."
         continue
@@ -324,6 +327,7 @@ run_module_agent() {
       write_progress_status "$module_id" "FAILED" "$module_name"
       return 1
     fi
+    rm -f "$prompt_file"
 
     strip_outer_code_fence_if_present "$tmp_output"
 
